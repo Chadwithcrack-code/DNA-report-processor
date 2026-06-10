@@ -20,11 +20,12 @@ def detect_type(df):
 def clean(df):
     print("Ticker")
     #ATG count
+    df["sequence"] = df["sequence"].astype("string")
     df["atg"] = df["sequence"].str.count("ATG", flags=re.IGNORECASE)
     print("atg count complete")
 
     #sequence length
-    df["seq_length"] = df["sequence"].str.count(r"\w")
+    df["seq_length"] = df["sequence"].str.strip().str.len()
     print("sequence count complete")
 
     #atg to sequence length ratio
