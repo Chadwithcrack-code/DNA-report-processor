@@ -1,107 +1,106 @@
 import streamlit as st
 from processor import process
 from cleaner import clean
-from io import BytesIO
+import io
 import analysis
+import traceback
 
-if "counter" not in st.session_state:
-    st.session_state.counter = 0
-    st.session_state.files = ""
-    st.session_state.min_amino_length = 50
-    st.session_state.start_codon_threshold = 2.8
-    st.session_state.clean_df = ""
-    st.session_state.translation = 1
+# Setup must be the first Streamlit command
+st.set_page_config(page_title="FASTA Processor", layout="wide")
 
-
-def control(step):
-    st.session_state.counter = step
-
+# Cache using the raw bytes to prevent Streamlit UploadedFile object dropping
 @st.cache_data(show_spinner=False)
-def get_clean_df(file_obj):
+def get_clean_df(file_bytes):
+    file_obj = io.BytesIO(file_bytes)
     v = clean(process(file_obj))
     return v
 
-
 def main():
-    st.set_page_config(page_title="FASTA Processor", layout="wide")
+    st.title("🧬 CO Automation FASTA PROCESSOR")
+    st.markdown("Automated sequence profiling, translation, and biophysical analysis.")
+
+    # ==========================================
+    # SIDEBAR PARAMETERS
+    # ==========================================
     st.sidebar.title("Parameters")
     st.sidebar.divider()
-    st.sidebar.number_input("Min protein length", value=50, key="min_amino_length")
+    
+    min_length = st.sidebar.number_input("Min protein length", value=50, step=10)
     st.sidebar.divider()
-    st.sidebar.slider("Start codon threshold(%)", value=3, key="start_codon_threshold")
+    
+    threshold = st.sidebar.slider("Start codon threshold(%)", min_value=0.5, max_value=10.0, value=3.0, step=0.1)
     st.sidebar.divider()
     
     Translation_t = {
-    "Standard (Table 1)": 1,
-    "Bacterial/Archaeal (Table 11)": 11,
-    "Mitochondrial (Table 2)": 2,
-    "Yeast Mitochondrial (Table 3)": 3
+        "Standard (Table 1)": 1,
+        "Bacterial/Archaeal (Table 11)": 11,
+        "Mitochondrial (Table 2)": 2,
+        "Yeast Mitochondrial (Table 3)": 3
     }
-    st.session_state.translation = st.sidebar.selectbox("Translation table", options=list(Translation_t.keys()))
+    # Extract the actual integer ID for the backend logic
+    selected_table = st.sidebar.selectbox("Translation table", options=list(Translation_t.keys()))
+    table_id = Translation_t[selected_table]
 
+    # ==========================================
+    # FILE INGESTION
+    # ==========================================
+    st.header("1. Upload Data")
+    uploaded_file = st.file_uploader("Upload FASTA (Max 200MB)", type=[".fasta", ".fa", ".fas", ".fna"])
 
-    if st.session_state.counter == 0:
-        st.title("🧬 CO Automation FASTA PROCESSOR")
-        st.markdown("Automated sequence profiling, translation, and biophysical analysis.")
-
-
-        st.header("Upload file below")
-        st.session_state.files = st.file_uploader("Insert",type=[".fasta",".fa",".fas",".fna"])
-        st.button("Process", on_click=control, args=(1,))
-
-
-    with st.spinner("Processing data... Please wait."):
-    
-        if st.session_state.files is not None and st.session_state.counter == 1:
-            df = get_clean_df(st.session_state.files)
-
+    # Streamlit naturally waits here until a file is provided. No counter needed.
+    if uploaded_file is not None:
+        
+        st.header("2. Analysis Report")
+        with st.spinner("Processing dataset..."):
             
             try:
-                amino, proteins = analysis.analyze_amino(df=df,
-                perc=st.session_state.start_codon_threshold,
-                min_amino_length=st.session_state.min_amino_length,
-                tb=st.session_state.translation
-
+                # 1. Safely extract bytes and pass to cached ingestion
+                file_bytes = uploaded_file.getvalue()
+                df = get_clean_df(file_bytes)
+                
+                # 2. Run your analysis algorithm
+                amino, proteins = analysis.analyze_amino(
+                    df=df,
+                    perc=threshold,
+                    min_amino_length=min_length,
+                    tb=table_id
                 )
-                st.success("Analysis complete!!")
-                st.metric("Longest poly-peptide chain:", value=proteins['sequence'].str.len().max())
-                st.success("Analysis successful!")
+                
+                # 3. Dashboard UI
+                st.success("✅ Analysis complete!")
+                
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Total Sequences Parsed", value=len(df))
-                #st.write(amino.loc[amino["Concentration (%)"].idxmax()])
-                # 1. Find the index of the highest concentration
+                
                 top_index = amino["Concentration (%)"].idxmax()
-
-                # 2. Extract the pure string and float values using that index
                 top_aa = amino.loc[top_index, "Amino Acid"]
                 top_conc = amino.loc[top_index, "Concentration (%)"]
-
-                # 3. Pass the clean variables into the Streamlit metric
-                col2.metric(label=f"Most Expressed Amino acid: {top_aa}", value=f"{top_conc:.2f}%")
-                col3.metric("Longest Polypeptide Chain", value=proteins['sequence'].str.len().max() if not proteins.empty else 0)
+                
+                col2.metric(label=f"Most Expressed: {top_aa}", value=f"{top_conc:.2f}%")
+                col3.metric("Longest Polypeptide", value=proteins['sequence'].str.len().max() if not proteins.empty else 0)
 
                 st.divider()
     
                 st.subheader("Amino Acid Distribution Profile")
                 st.bar_chart(data=amino, x="Amino Acid", y="Concentration (%)", color="#4CAF50", horizontal=True)
+                
                 st.subheader("Extracted Coding Sequences (CDS)")
                 st.dataframe(proteins, use_container_width=True)
 
                 st.download_button(
                     label="📥 Export Protein CDS (CSV)",
-                    data=proteins.to_csv().encode('utf-8'),
+                    data=proteins.to_csv(index=False).encode('utf-8'), # Removed index for cleaner client exports
                     file_name="cleaned_proteins_report.csv",
                     mime="text/csv",
                     use_container_width=True
                 )
 
-            except ValueError as e:
-                st.error(str(e))
-                st.write(df)
-    
-
-    
-
+            except Exception as e:
+                # Global exception trap catches processor, cleaner, and analysis errors
+                st.error(f"⚠️ Pipeline Interrupted: {str(e)}")
+                # Expandable traceback is excellent for debugging but keeps the UI clean for the client
+                with st.expander("Show System Logs"):
+                    st.code(traceback.format_exc(), language="bash")
 
 if __name__ == "__main__":
     main()
