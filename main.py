@@ -28,7 +28,7 @@ def main():
     min_length = st.sidebar.number_input("Min protein length", value=50, step=10)
     st.sidebar.divider()
     
-    threshold = st.sidebar.slider("Start codon threshold(%)", min_value=0.5, max_value=10.0, value=3.0, step=0.1)
+    threshold = st.sidebar.slider("Start codon threshold(%)", min_value=0.01, max_value=10.0, value=3.0, step=0.1)
     st.sidebar.divider()
     
     Translation_t = {
@@ -71,26 +71,56 @@ def main():
                 
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Total Sequences Parsed", value=len(df))
-                
-                top_index = amino["Concentration (%)"].idxmax()
-                top_aa = amino.loc[top_index, "Amino Acid"]
-                top_conc = amino.loc[top_index, "Concentration (%)"]
-                
-                col2.metric(label=f"Most Expressed: {top_aa}", value=f"{top_conc:.2f}%")
+
+                if not amino.empty:
+                    top_index = amino["Concentration (%)"].idxmax()
+                    top_aa = amino.loc[top_index, "Amino Acid"]
+                    top_conc = amino.loc[top_index, "Concentration (%)"]
+                    col2.metric(label=f"Most Expressed: {top_aa}", value=f"{top_conc:.2f}%")
+                else:
+                    col2.metric(label="Most Expressed", value="None found")
+                    
                 col3.metric("Longest Polypeptide", value=proteins['sequence'].str.len().max() if not proteins.empty else 0)
+
+                # --- NEW METRICS BLOCK ---
+                if not proteins.empty and "MW (kDa)" in proteins.columns:
+                    st.divider()
+                    col4, col5, col6 = st.columns(3)
+                    avg_mw = proteins["MW (kDa)"].mean()
+                    avg_gravy = proteins["GRAVY Score"].mean()
+                    avg_iso = proteins["Isoelectric Point"].mean()
+                    
+                    col4.metric("Avg Molecular Weight", f"{avg_mw:.2f} kDa", help="Calculated using BioPython ProtParam")
+                    col5.metric("Avg GRAVY Score", f"{avg_gravy:.2f}", help="Grand Average of Hydropathy. Positive values indicate hydrophobic proteins.")
+                    col6.metric("Avg Isoelectric Point", f"{avg_iso:.2f}", help="The pH at which the molecule carries no net electrical charge.")
+                # -------------------------
 
                 st.divider()
     
                 st.subheader("Amino Acid Distribution Profile")
-                st.bar_chart(data=amino, x="Amino Acid", y="Concentration (%)", color="#4CAF50", horizontal=True)
                 
-                st.subheader("Extracted Coding Sequences (CDS)")
-                st.dataframe(proteins, use_container_width=True)
+                # Only plot the chart if there is data
+                if not amino.empty:
+                    st.bar_chart(data=amino, x="Amino Acid", y="Concentration (%)", color="#4CAF50", horizontal=True)
+                else:
+                    st.info("No amino acids passed the filtering thresholds. Try lowering the Start Codon Threshold or Minimum Protein Length.")
+                
+                st.subheader("Extracted Coding Sequences (CDS) - Preview")
+                
+                # --- UI SAFETY LIMIT ---
+                # Only render the first 1000 rows to the browser to prevent UI crashing.
+                # The browser stays light and fast, no matter how big the genome is.
+                max_display_rows = 1000
+                st.dataframe(proteins.head(max_display_rows), use_container_width=True)
+                
+                if len(proteins) > max_display_rows:
+                    st.info(f"💡 UI Limited to the first {max_display_rows} sequences to maintain browser performance. The full dataset contains {len(proteins):,} sequences.")
 
+                # The download button still exports the FULL dataset, not just the preview.
                 st.download_button(
-                    label="📥 Export Protein CDS (CSV)",
-                    data=proteins.to_csv(index=False).encode('utf-8'), # Removed index for cleaner client exports
-                    file_name="cleaned_proteins_report.csv",
+                    label="📥 Export Full Protein CDS (CSV)",
+                    data=proteins.to_csv(index=False).encode('utf-8'), 
+                    file_name="co_automation_proteins_report.csv",
                     mime="text/csv",
                     use_container_width=True
                 )

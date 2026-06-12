@@ -21,6 +21,7 @@ def process(open_file):
         
         # Consume the generator lazily
         df = pd.DataFrame.from_records(record_generator)
+        print(df)
         
         if df.empty:
             raise ValueError("The uploaded file contains no valid FASTA sequences.")

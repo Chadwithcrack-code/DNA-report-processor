@@ -1,78 +1,94 @@
-
 from Bio.Seq import Seq
-from cleaner import detect_type
+from Bio.SeqUtils.ProtParam import ProteinAnalysis
+from collections import Counter
 import pandas as pd
 
 def analyze_amino(df, perc, min_amino_length=50, tb=1):
-    #percentage of unusual atg to sequence length (this can be changed with your discretion)
-    concentrated_atg = []
+    if df.empty:
+        return pd.DataFrame(columns=["Amino Acid", "Concentration (%)"]), pd.DataFrame()
 
-    #pcr = Protein coding regions: this is a df that only includes the protein coding regions
-    pcr = df[((df["stop codons"] / df["atg"]) < 2) & (df["atg_to_length(%)"] > perc)]
-
-    #Raw DNA strand for processing
-    raw_seq = pcr.loc[:, "sequence"]
-
-    #Converting the raw DNA strandinto a Biopython Seq object so that we use .translate() method
-    #The translate method adds a * by the stop codon which we can use split to get the protein
-    #trimmed the sequence to be a multiple of 3 (codon length)
-
-    #type = detect_type(df)
-    #print(type)
-    # Initialize a list to hold the mapped data instead of a flat list
+    molecule_type = df["molecule_type"].iloc[0] if "molecule_type" in df.columns else "DNA"
     extracted_proteins = []
     count = 0
+    
+    # 1. Filter Logic based on Molecule Type
+    if molecule_type in ["DNA", "RNA"]:
+        # REMOVED the hardcoded stop_to_atg_ratio constraint.
+        # This allows large genomes (which naturally have a ~3.0 ratio) to pass to the translation engine.
+        pcr = df[df["atg_to_length(%)"] >= perc]
+    else:
+        pcr = df[df["seq_length"] >= min_amino_length]
 
-    molecule_type = detect_type(df)
+    raw_seq = pcr["sequence"]
+    
+    global_aa_counter = Counter()
 
-    # .items() yields BOTH the original pandas index and the sequence string
+    # 2. Iterate, Translate, and Profile
     for original_index, seq_value in raw_seq.items():
-        
-        # 1. Translate and split based on molecule type
+        if pd.isna(seq_value): continue
+            
         if molecule_type == "DNA":
-            chunks = str(Seq(seq_value).translate()).split("*")
+            seq_obj = Seq(seq_value[:len(seq_value) - len(seq_value)%3])
+            chunks = str(seq_obj.translate(table=tb)).split("*")
         elif molecule_type == "RNA":
-            chunks = str(Seq(seq_value).back_transcribe().translate(table=tb)).split("*")
-        elif molecule_type == "Protein":
-            chunks = str(seq_value).split("*")
-        else: 
-            raise ValueError("problem with format type:")
+            seq_obj = Seq(seq_value[:len(seq_value) - len(seq_value)%3])
+            chunks = str(seq_obj.back_transcribe().translate(table=tb)).split("*")
+        else:
+            chunks = [str(seq_value)]
 
-        # 2. Immediately filter for Methionine while we still know the original_index
         for chunk in chunks:
-            if chunk.startswith("M"):
-                amino_length = len(chunk)
+            # 1. Isolate the valid ORF within the chunk
+            if molecule_type in ["DNA", "RNA"]:
+                m_index = chunk.find("M")
+                if m_index != -1:
+                    valid_protein = chunk[m_index:]
+                else:
+                    valid_protein = "" 
+            else:
+                valid_protein = chunk
 
-                if chunk.startswith("M") and amino_length >= min_amino_length:
-                    extracted_proteins.append({
-                        "original_index": original_index,
-                        "protein_label": f"Proteins_{count}",
-                        "sequence": chunk,
-                        "length": amino_length
-                    })
-                    count += 1
+            amino_length = len(valid_protein)
+            
+            # 2. Enforce localized length and calculate biometrics
+            if amino_length >= min_amino_length:
+                gravy, mw, iso_p = None, None, None
+                
+                try:
+                    clean_seq = valid_protein.replace("X", "").replace("B", "").replace("Z", "")
+                    if len(clean_seq) > 0:
+                        pa = ProteinAnalysis(clean_seq)
+                        gravy = round(pa.gravy(), 3)
+                        mw = round(pa.molecular_weight() / 1000, 2) 
+                        iso_p = round(pa.isoelectric_point(), 2)
+                except Exception:
+                    pass 
                     
+                extracted_proteins.append({
+                    "original_index": original_index,
+                    "protein_label": f"Protein_{count}",
+                    "sequence": valid_protein,
+                    "length": amino_length,
+                    "MW (kDa)": mw,
+                    "GRAVY Score": gravy,
+                    "Isoelectric Point": iso_p
+                })
+                count += 1
+                
+                global_aa_counter.update(valid_protein)
 
-    # 3. Convert the structured list back into a Pandas DataFrame
+    # 3. Compile the Protein DataFrame
     c_genes_df = pd.DataFrame(extracted_proteins)
-    if c_genes_df.empty:
-        return pd.DataFrame(columns=["Amino Acid", "Concentration (%)"]), c_genes_df
-
-    # 4. Set the index of this new table to perfectly match your main Python series
     if not c_genes_df.empty:
         c_genes_df.set_index("original_index", inplace=True)
-    
-    print(c_genes_df)
-    #Next we take all the proteins and join them into a coherent string 
-    #We break up element into a python list
-    #finally we use turn it into a pd.Series so that we can calculate the percetage using value_counts
-    aa_percentages = pd.Series(list(c_genes_df["sequence"].str.cat())).value_counts(normalize=True) * 100
 
-    #Cleaning the DataFrame
-    final_composition_df = aa_percentages.reset_index()
-    final_composition_df.index += 1
-    final_composition_df.columns = ["Amino Acid", "Concentration (%)"]
-
-    # Round the numbers so it looks clean for the README screenshot
-    final_composition_df["Concentration (%)"] = final_composition_df["Concentration (%)"].round(2)
+    # 4. Process the Global Counter into percentages
+    total_aa = sum(global_aa_counter.values())
+    if total_aa > 0:
+        aa_data = [{"Amino Acid": aa, "Concentration (%)": round((cnt / total_aa) * 100, 2)} 
+                   for aa, cnt in global_aa_counter.items()]
+        final_composition_df = pd.DataFrame(aa_data).sort_values("Concentration (%)", ascending=False).reset_index(drop=True)
+        final_composition_df.index += 1
+    else:
+        final_composition_df = pd.DataFrame(columns=["Amino Acid", "Concentration (%)"])
+        
     return final_composition_df, c_genes_df
