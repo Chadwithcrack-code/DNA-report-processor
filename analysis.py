@@ -1,5 +1,6 @@
 from Bio.Seq import Seq
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
+from Bio.SeqUtils.IsoelectricPoint import IsoelectricPoint
 from collections import Counter
 import pandas as pd
 
@@ -13,7 +14,6 @@ def analyze_amino(df, perc, min_amino_length=50, tb=1):
     
     # 1. Filter Logic based on Molecule Type
     if molecule_type in ["DNA", "RNA"]:
-        # REMOVED the hardcoded stop_to_atg_ratio constraint.
         # This allows large genomes (which naturally have a ~3.0 ratio) to pass to the translation engine.
         pcr = df[df["atg_to_length(%)"] >= perc]
     else:
@@ -59,7 +59,8 @@ def analyze_amino(df, perc, min_amino_length=50, tb=1):
                         pa = ProteinAnalysis(clean_seq)
                         gravy = round(pa.gravy(), 3)
                         mw = round(pa.molecular_weight() / 1000, 2) 
-                        iso_p = round(pa.isoelectric_point(), 2)
+                        iep = IsoelectricPoint(clean_seq)
+                        iso_p = round(iep.pi(max_=14.0),2)
                 except Exception:
                     pass 
                     
