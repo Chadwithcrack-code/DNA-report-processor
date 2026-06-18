@@ -1,0 +1,7 @@
+Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
+
+This code is provided for academic, educational, and non-commercial evaluation purposes only. 
+
+Commercial use, internal corporate use, or deployment in a production lab environment is strictly prohibited without an explicit commercial license. 
+
+For enterprise licensing, custom integration, and optimized, high-throughput architectures, please contact CO Automation.

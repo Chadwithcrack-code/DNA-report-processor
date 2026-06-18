@@ -26,5 +26,21 @@ A highly optimised genomic processor that takes in raw fasta files and outputs a
     Upload your fasta file and wait for the report to generate (takes < 1 minute), you can change the parameters to encompass what you looking for and more parameters will be added in future updates
     Lastly you can export the protein profile by clicking download right at the bottom of the website
 
+
+
+
+
+
 ## Notes:
-    If any bugs are found push requests are welcomed
+    If any bugs are found pull and push requests are welcomed!!
+
+### ⚠️ Commercial Use & Enterprise Integration
+
+This open-source repository contains a lightweight, local version of the pipeline designed strictly for **academic and non-commercial evaluation**. 
+
+**Note:** This version is built for accessibility, not speed. It is *not* optimized for high-throughput enterprise data architecture or massive parallel sequencing loads.
+
+If your lab requires a fully automated, highly efficient version integrated directly into your secure cloud infrastructure, we build custom pipelines so reach out below.
+
+📧 **Enterprise Inquiries:** chad@coautomationsolutions.com  
+🔗 **Connect on LinkedIn:** [Chad Ontyamba](https://www.linkedin.com/in/chad-o-ntyamba-487779413/)

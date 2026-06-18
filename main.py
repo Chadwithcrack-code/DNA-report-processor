@@ -20,7 +20,18 @@ def get_clean_df(file_bytes):
 
 def main():
     st.title("🧬 CO Automation FASTA PROCESSOR")
+    st.markdown(
+        """
+        <div style='margin-top: -15px; margin-bottom: 20px; color: gray;'>
+            <em>Created by <a href='https://www.linkedin.com/in/chad-o-ntyamba-487779413/' target='_blank' style='color: #4CAF50; text-decoration: none;'>Chad Ontyamba</a> | CO Automation</em>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
+    
     st.markdown("Automated sequence profiling, translation, and biophysical analysis.")
+    st.divider()
+
 
     # SIDEBAR PARAMETERS
 
