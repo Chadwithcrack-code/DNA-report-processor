@@ -20,7 +20,7 @@ A highly optimised genomic processor that takes in raw fasta files and outputs a
    ```
 2. For installation you can pip install uv and run 'uv sync' in the command line.
 
-3. Website link: 
+3. Website link: https://chadwithcrack-code-dna-report-processor-main-b6yo3r.streamlit.app/
 
 ## Usage
     Upload your fasta file and wait for the report to generate (takes < 1 minute), you can change the parameters to encompass what you looking for and more parameters will be added in future updates
