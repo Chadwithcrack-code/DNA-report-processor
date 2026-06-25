@@ -105,7 +105,6 @@ def main():
                     
 
 
-                # --- NEW METRICS BLOCK ---
                 if not proteins.empty and "MW (kDa)" in proteins.columns:
                     st.divider()
                     col4, col5, col6 = st.columns(3)
@@ -158,7 +157,6 @@ def main():
                 
                 st.subheader("Extracted Coding Sequences (CDS) - Preview")
                 
-                #  UI SAFETY LIMIT 
                 # Only render the first 1000 rows to the browser to prevent UI crashing.
                 # The browser stays light and fast, no matter how big the genome is.
                 max_display_rows = 500
@@ -167,7 +165,7 @@ def main():
                 if len(proteins) > max_display_rows:
                     st.info(f"UI Limited to the first {max_display_rows} sequences to maintain browser performance. The full dataset contains {len(proteins):,} sequences.")
 
-                # The download button still exports the FULL dataset, not just the preview.
+                # The download button 
                 st.download_button(
                     label="📥 Export Full Protein CDS (CSV)",
                     data=proteins.to_csv(index=False).encode('utf-8'), 
@@ -176,6 +174,10 @@ def main():
                     use_container_width=True
                 )
 
+            
+            
+            
+            
             except Exception as e:
                 # Global exception trap catches processor, cleaner, and analysis errors
                 st.error(f"Pipeline Interrupted: {str(e)}")

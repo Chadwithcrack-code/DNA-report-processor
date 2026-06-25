@@ -4,6 +4,7 @@ from Bio.SeqUtils.IsoelectricPoint import IsoelectricPoint
 from collections import Counter
 import pandas as pd
 
+
 def analyze_amino(df, perc, min_amino_length=50, tb=1):
     if df.empty:
         return pd.DataFrame(columns=["Amino Acid", "Concentration (%)"]), pd.DataFrame()

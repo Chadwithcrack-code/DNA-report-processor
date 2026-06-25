@@ -15,6 +15,7 @@ def detect_type(sequence_series):
     else:
         return "DNA"
 
+
 def clean(df):
     # 1. Detect type once for the whole column to avoid row-by-row overhead
     mol_type = detect_type(df["sequence"])
